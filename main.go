@@ -19,10 +19,10 @@ import (
 
 	"golang.org/x/text/transform"
 
+	"github.com/gdamore/tcell/termbox"
 	"github.com/mattn/go-colorable"
 	enc "github.com/mattn/go-encoding"
 	"github.com/mattn/go-runewidth"
-	"github.com/nsf/termbox-go"
 	"github.com/saracen/walker"
 )
 
