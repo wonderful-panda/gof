@@ -68,6 +68,18 @@ var (
 	migemoDict		 migemo.Dict
 )
 
+func matchModeName(mode MatchMode) string {
+	switch mode {
+	case Fuzzy:
+		return "Fuzzy"
+	case Migemo:
+		return "Migemo"
+	default:
+		return "Normal"
+	}
+}
+
+
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -223,7 +235,7 @@ func filter(mode MatchMode) {
 	}
 }
 
-func drawLines() {
+func drawLines(matchMode MatchMode) {
 	defer func() {
 		recover()
 	}()
@@ -300,7 +312,8 @@ func drawLines() {
 		tprint(0, height-2, tcell.StyleDefault.Foreground(tcell.ColorGreen), string([]rune("-\\|/")[scanning%4]))
 		scanning++
 	}
-	tprintf(2, height-2, tcell.StyleDefault, "%d/%d(%d)", len(current), len(files), len(selected))
+	
+	tprintf(2, height-2, tcell.StyleDefault, "%d/%d(%d) [%s]", len(current), len(files), len(selected), matchModeName(matchMode))
 	tprint(0, height-1, tcell.StyleDefault.Foreground(tcell.ColorBlue).Bold(true), "> ")
 	tprint(2, height-1, tcell.StyleDefault.Bold(true), string(input))
 	screen.ShowCursor(2+runewidth.StringWidth(string(input[0:cursorX])), height-1)
@@ -521,13 +534,13 @@ func main() {
 		mutex.Unlock()
 		if d {
 			filter(matchMode)
-			drawLines()
+			drawLines(matchMode)
 
 			mutex.Lock()
 			dirty = false
 			mutex.Unlock()
 		} else {
-			drawLines()
+			drawLines(matchMode)
 		}
 	}
 	timer = time.AfterFunc(0, redrawFunc)
@@ -714,7 +727,7 @@ loop:
 			if update {
 				filter(matchMode)
 			}
-			drawLines()
+			drawLines(matchMode)
 		}
 	}
 	timer.Stop()
