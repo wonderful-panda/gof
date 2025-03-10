@@ -19,7 +19,7 @@ import (
 
 	"golang.org/x/text/transform"
 
-	"github.com/gdamore/tcell/termbox"
+	"github.com/gdamore/tcell"
 	"github.com/mattn/go-colorable"
 	enc "github.com/mattn/go-encoding"
 	"github.com/mattn/go-runewidth"
@@ -49,6 +49,7 @@ var (
 	cursorX, cursorY int
 	offset           int
 	width, height    int
+	screen			 tcell.Screen
 	mutex            sync.Mutex
 	dirty            = false
 	duration         = 20 * time.Millisecond
@@ -64,16 +65,16 @@ func env(key, def string) string {
 	return def
 }
 
-func tprint(x, y int, fg, bg termbox.Attribute, msg string) {
+func tprint(x, y int, st tcell.Style, msg string) {
 	for _, c := range []rune(msg) {
-		termbox.SetCell(x, y, c, fg, bg)
+		screen.SetContent(x, y, c, nil, st)
 		x += runewidth.RuneWidth(c)
 	}
 }
 
-func tprintf(x, y int, fg, bg termbox.Attribute, format string, args ...interface{}) {
+func tprintf(x, y int, st tcell.Style, format string, args ...interface{}) {
 	s := fmt.Sprintf(format, args...)
-	tprint(x, y, fg, bg, s)
+	tprint(x, y, st, s)
 }
 
 func filter(fuzzy bool) {
@@ -202,8 +203,8 @@ func drawLines() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	width, height = termbox.Size()
-	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	width, height = screen.Size()
+	screen.Clear()
 
 	pat := ""
 	for _, r := range input {
@@ -247,65 +248,65 @@ func drawLines() {
 			}
 			if pos1 <= f && f < pos2 {
 				if selected {
-					termbox.SetCell(x, y, c, termbox.ColorRed|termbox.AttrBold, termbox.ColorDefault)
+					screen.SetCell(x, y, tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true), c)
 				} else if cursorY == n {
-					termbox.SetCell(x, y, c, termbox.ColorYellow|termbox.AttrBold|termbox.AttrUnderline, termbox.ColorDefault)
+					screen.SetCell(x, y, tcell.StyleDefault.Foreground(tcell.ColorYellow).Bold(true).Underline(true), c)
 				} else {
-					termbox.SetCell(x, y, c, termbox.ColorGreen|termbox.AttrBold, termbox.ColorDefault)
+					screen.SetCell(x, y, tcell.StyleDefault.Foreground(tcell.ColorGreen).Bold(true), c)
 				}
 			} else {
 				if selected {
-					termbox.SetCell(x, y, c, termbox.ColorRed, termbox.ColorDefault)
+					screen.SetCell(x, y, tcell.StyleDefault.Foreground(tcell.ColorRed), c)
 				} else if cursorY == n {
-					termbox.SetCell(x, y, c, termbox.ColorYellow|termbox.AttrUnderline, termbox.ColorDefault)
+					screen.SetCell(x, y, tcell.StyleDefault.Foreground(tcell.ColorYellow).Underline(true), c)
 				} else {
-					termbox.SetCell(x, y, c, termbox.ColorDefault, termbox.ColorDefault)
+					screen.SetCell(x, y, tcell.StyleDefault, c)
 				}
 			}
 			x += w
 		}
 	}
 	if cursorY >= 0 {
-		tprint(0, height-3-(cursorY-offset), termbox.ColorRed|termbox.AttrBold, termbox.ColorDefault, "> ")
+		tprint(0, height-3-(cursorY-offset), tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true), "> ")
 	}
 	if scanning >= 0 {
-		tprint(0, height-2, termbox.ColorGreen, termbox.ColorDefault, string([]rune("-\\|/")[scanning%4]))
+		tprint(0, height-2, tcell.StyleDefault.Foreground(tcell.ColorGreen), string([]rune("-\\|/")[scanning%4]))
 		scanning++
 	}
-	tprintf(2, height-2, termbox.ColorDefault, termbox.ColorDefault, "%d/%d(%d)", len(current), len(files), len(selected))
-	tprint(0, height-1, termbox.ColorBlue|termbox.AttrBold, termbox.ColorDefault, "> ")
-	tprint(2, height-1, termbox.ColorDefault|termbox.AttrBold, termbox.ColorDefault, string(input))
-	termbox.SetCursor(2+runewidth.StringWidth(string(input[0:cursorX])), height-1)
-	termbox.Flush()
+	tprintf(2, height-2, tcell.StyleDefault, "%d/%d(%d)", len(current), len(files), len(selected))
+	tprint(0, height-1, tcell.StyleDefault.Foreground(tcell.ColorBlue).Bold(true), "> ")
+	tprint(2, height-1, tcell.StyleDefault.Bold(true), string(input))
+	screen.ShowCursor(2+runewidth.StringWidth(string(input[0:cursorX])), height-1)
+	screen.Show()
 }
 
-var actionKeys = []termbox.Key{
-	termbox.KeyCtrlA,
-	termbox.KeyCtrlB,
-	termbox.KeyCtrlC,
-	termbox.KeyCtrlD,
-	termbox.KeyCtrlE,
-	termbox.KeyCtrlF,
-	termbox.KeyCtrlG,
-	termbox.KeyCtrlH,
-	termbox.KeyCtrlI,
-	termbox.KeyCtrlJ,
-	termbox.KeyCtrlK,
-	termbox.KeyCtrlL,
-	termbox.KeyCtrlM,
-	termbox.KeyCtrlN,
-	termbox.KeyCtrlO,
-	termbox.KeyCtrlP,
-	termbox.KeyCtrlQ,
-	termbox.KeyCtrlR,
-	termbox.KeyCtrlS,
-	termbox.KeyCtrlT,
-	termbox.KeyCtrlU,
-	termbox.KeyCtrlV,
-	termbox.KeyCtrlW,
-	termbox.KeyCtrlX,
-	termbox.KeyCtrlY,
-	termbox.KeyCtrlZ,
+var actionKeys = []tcell.Key{
+	tcell.KeyCtrlA,
+	tcell.KeyCtrlB,
+	tcell.KeyCtrlC,
+	tcell.KeyCtrlD,
+	tcell.KeyCtrlE,
+	tcell.KeyCtrlF,
+	tcell.KeyCtrlG,
+	tcell.KeyCtrlH,
+	tcell.KeyCtrlI,
+	tcell.KeyCtrlJ,
+	tcell.KeyCtrlK,
+	tcell.KeyCtrlL,
+	tcell.KeyCtrlM,
+	tcell.KeyCtrlN,
+	tcell.KeyCtrlO,
+	tcell.KeyCtrlP,
+	tcell.KeyCtrlQ,
+	tcell.KeyCtrlR,
+	tcell.KeyCtrlS,
+	tcell.KeyCtrlT,
+	tcell.KeyCtrlU,
+	tcell.KeyCtrlV,
+	tcell.KeyCtrlW,
+	tcell.KeyCtrlX,
+	tcell.KeyCtrlY,
+	tcell.KeyCtrlZ,
 }
 
 func readLines(ctx context.Context, wg *sync.WaitGroup, r io.Reader) {
@@ -505,12 +506,14 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	err = termbox.Init()
-	if err != nil {
+	if screen, err = tcell.NewScreen(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	termbox.SetInputMode(termbox.InputEsc)
+	if err = screen.Init(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	redrawFunc()
 	actionKey := ""
@@ -520,11 +523,13 @@ loop:
 		update := false
 
 		// Polling key events
-		switch ev := termbox.PollEvent(); ev.Type {
-		case termbox.EventKey:
+		ev := screen.PollEvent();
+		switch ev := ev.(type) {
+		case *tcell.EventKey:
+			key := ev.Key()
 			for _, ka := range strings.Split(action, ",") {
 				for i, kv := range actionKeys {
-					if ev.Key != kv {
+					if key != kv {
 						continue
 					}
 					ak := fmt.Sprintf("ctrl-%c", 'a'+i)
@@ -540,52 +545,52 @@ loop:
 					}
 				}
 			}
-			switch ev.Key {
-			case termbox.KeyEsc, termbox.KeyCtrlD, termbox.KeyCtrlC:
-				termbox.Close()
+			switch key {
+			case tcell.KeyEsc, tcell.KeyCtrlD, tcell.KeyCtrlC:
+				screen.Fini()
 				os.Exit(exit)
-			case termbox.KeyHome, termbox.KeyCtrlA:
+			case tcell.KeyHome, tcell.KeyCtrlA:
 				cursorX = 0
-			case termbox.KeyEnd, termbox.KeyCtrlE:
+			case tcell.KeyEnd, tcell.KeyCtrlE:
 				cursorX = len(input)
-			case termbox.KeyEnter:
+			case tcell.KeyEnter:
 				if cursorY >= 0 && cursorY < len(current) {
 					if len(selected) == 0 {
 						selected = append(selected, current[cursorY].name)
 					}
 					break loop
 				}
-			case termbox.KeyArrowLeft:
+			case tcell.KeyLeft:
 				if cursorX > 0 {
 					cursorX--
 				}
-			case termbox.KeyArrowRight:
+			case tcell.KeyRight:
 				if cursorX < len([]rune(input)) {
 					cursorX++
 				}
-			case termbox.KeyArrowUp, termbox.KeyCtrlK, termbox.KeyCtrlP:
+			case tcell.KeyUp, tcell.KeyCtrlK, tcell.KeyCtrlP:
 				if cursorY < len(current)-1 {
 					cursorY++
 					if offset < cursorY-(height-3) {
 						offset = cursorY - (height - 3)
 					}
 				}
-			case termbox.KeyArrowDown, termbox.KeyCtrlJ, termbox.KeyCtrlN:
+			case tcell.KeyDown, tcell.KeyCtrlJ, tcell.KeyCtrlN:
 				if cursorY > 0 {
 					cursorY--
 					if cursorY < offset {
 						offset = cursorY
 					}
 				}
-			case termbox.KeyCtrlI:
+			case tcell.KeyCtrlI:
 				heading = !heading
-			case termbox.KeyCtrlL:
+			case tcell.KeyCtrlL:
 				update = true
-			case termbox.KeyCtrlU:
+			case tcell.KeyCtrlU:
 				cursorX = 0
 				input = []rune{}
 				update = true
-			case termbox.KeyCtrlW:
+			case tcell.KeyCtrlW:
 				part := string(input[0:cursorX])
 				rest := input[cursorX:len(input)]
 				pos := regexp.MustCompile(`\s+`).FindStringIndex(part)
@@ -597,7 +602,7 @@ loop:
 				}
 				cursorX = len(input)
 				update = true
-			case termbox.KeyCtrlZ:
+			case tcell.KeyCtrlZ:
 				found := -1
 				name := current[cursorY].name
 				for i, s := range selected {
@@ -612,34 +617,32 @@ loop:
 					selected = append(selected[:found], selected[found+1:]...)
 				}
 				update = true
-			case termbox.KeyBackspace, termbox.KeyBackspace2:
+			case tcell.KeyBackspace, tcell.KeyBackspace2:
 				if cursorX > 0 {
 					input = append(input[0:cursorX-1], input[cursorX:len(input)]...)
 					cursorX--
 					update = true
 				}
-			case termbox.KeyDelete:
+			case tcell.KeyDelete:
 				if cursorX < len([]rune(input)) {
 					input = append(input[0:cursorX], input[cursorX+1:len(input)]...)
 					update = true
 				}
-			case termbox.KeyCtrlR:
+			case tcell.KeyCtrlR:
 				fuzzy = !fuzzy
 				update = true
 			default:
-				if ev.Key == termbox.KeySpace {
-					ev.Ch = ' '
-				}
-				if ev.Ch > 0 {
+				ch := ev.Rune()
+				if ch > 0 {
 					out := []rune{}
 					out = append(out, input[0:cursorX]...)
-					out = append(out, ev.Ch)
+					out = append(out, ch)
 					input = append(out, input[cursorX:len(input)]...)
 					cursorX++
 					update = true
 				}
 			}
-		case termbox.EventError:
+		case *tcell.EventError:
 			update = false
 		}
 
@@ -665,8 +668,8 @@ loop:
 	// Request terminating
 	cancel()
 
-	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	termbox.Close()
+	screen.Clear()
+	screen.Fini()
 	stopTerminal()
 
 	wg.Wait()
