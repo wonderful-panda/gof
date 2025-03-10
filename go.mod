@@ -1,6 +1,8 @@
 module github.com/mattn/gof
 
-go 1.17
+go 1.21
+
+toolchain go1.24.1
 
 require (
 	github.com/gdamore/tcell v1.4.0
@@ -13,6 +15,9 @@ require (
 
 require (
 	github.com/gdamore/encoding v1.0.0 // indirect
+	github.com/koron-go/skkdict v1.0.0 // indirect
+	github.com/koron/gelatin v0.0.0-20160729020448-88d6a03ce765 // indirect
+	github.com/koron/gomigemo v1.0.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect

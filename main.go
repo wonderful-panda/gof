@@ -20,6 +20,8 @@ import (
 	"golang.org/x/text/transform"
 
 	"github.com/gdamore/tcell"
+	"github.com/koron/gomigemo/embedict"
+	"github.com/koron/gomigemo/migemo"
 	"github.com/mattn/go-colorable"
 	enc "github.com/mattn/go-encoding"
 	"github.com/mattn/go-runewidth"
@@ -40,6 +42,13 @@ type matched struct {
 	index    int
 }
 
+type MatchMode = int
+const (
+	Normal MatchMode = iota
+	Fuzzy
+	Migemo
+)
+
 var (
 	input            = []rune{}
 	files            []string
@@ -56,6 +65,7 @@ var (
 	timer            *time.Timer
 	scanning         = 0
 	ignorere         *regexp.Regexp
+	migemoDict		 migemo.Dict
 )
 
 func env(key, def string) string {
@@ -77,7 +87,7 @@ func tprintf(x, y int, st tcell.Style, format string, args ...interface{}) {
 	tprint(x, y, st, s)
 }
 
-func filter(fuzzy bool) {
+func filter(mode MatchMode) {
 	mutex.Lock()
 	fs := files
 	inp := input
@@ -103,12 +113,29 @@ func filter(fuzzy bool) {
 				index:    n,
 			}
 		}
-	} else if fuzzy {
-		pat := "(?i)(?:.*)("
-		for _, r := range []rune(inp) {
-			pat += regexp.QuoteMeta(string(r)) + ".*?"
+	} else if mode == Fuzzy || mode == Migemo {
+		var pat string
+		if mode == Fuzzy {
+			pat = "(?i)(?:.*)("
+			for _, r := range []rune(inp) {
+				pat += regexp.QuoteMeta(string(r)) + ".*?"
+			}
+			pat += ")"
+		} else {
+			var err error
+			if migemoDict == migemo.Dict(nil) {
+				if migemoDict, err = embedict.Load(); err != nil {
+					fmt.Fprintln(os.Stderr, "Failed to load migemo dict:", err)
+					os.Exit(1)
+				}
+			}
+			if p, err := migemo.Pattern(migemoDict, string(inp)); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed to run migemo", string(inp), err)
+				return
+			} else {
+				pat = fmt.Sprintf("(?i)(%s)", p)
+			}
 		}
-		pat += ")"
 		re := regexp.MustCompile(pat)
 
 		tmp = make([]matched, 0, len(fs))
@@ -388,7 +415,8 @@ func listFiles(ctx context.Context, wg *sync.WaitGroup, cwd string) {
 }
 
 func main() {
-	var fuzzy bool
+	var fuzzy_ bool
+	var migemo_ bool
 	var root string
 	var exit int
 	var action string
@@ -396,8 +424,10 @@ func main() {
 	var tapiFunc string
 	var ignore string
 	var showVersion bool
+	var matchMode MatchMode
 
-	flag.BoolVar(&fuzzy, "f", false, "Fuzzy match")
+	flag.BoolVar(&fuzzy_, "f", false, "Fuzzy match")
+	flag.BoolVar(&migemo_, "m", false, "Migemo match")
 	flag.StringVar(&root, "d", "", "Root directory")
 	flag.IntVar(&exit, "x", 1, "Exit code for cancel")
 	flag.StringVar(&action, "a", "", "Action keys")
@@ -421,6 +451,23 @@ func main() {
 		ignorere, err = regexp.Compile(ignore)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	if fuzzy_ && migemo_ {
+		fmt.Fprintln(os.Stderr, "-f and -m can't be specified at the same time")
+		os.Exit(1)
+	}
+	if fuzzy_ {
+		matchMode = Fuzzy
+	} else if migemo_ {
+		matchMode = Migemo
+	} else {
+		matchMode = Normal
+	}
+	if migemo_ {
+		if migemoDict, err = embedict.Load(); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to load migemo dict:", err)
 			os.Exit(1)
 		}
 	}
@@ -473,7 +520,7 @@ func main() {
 		d := dirty
 		mutex.Unlock()
 		if d {
-			filter(fuzzy)
+			filter(matchMode)
 			drawLines()
 
 			mutex.Lock()
@@ -629,7 +676,14 @@ loop:
 					update = true
 				}
 			case tcell.KeyCtrlR:
-				fuzzy = !fuzzy
+				switch matchMode {
+				case Normal:
+					matchMode = Fuzzy
+				case Fuzzy:
+					matchMode = Migemo
+				default:
+					matchMode = Normal
+				}
 				update = true
 			default:
 				ch := ev.Rune()
@@ -658,7 +712,7 @@ loop:
 			}
 		} else {
 			if update {
-				filter(fuzzy)
+				filter(matchMode)
 			}
 			drawLines()
 		}
